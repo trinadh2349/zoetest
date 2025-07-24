@@ -3,7 +3,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from zoe import run, process_new_mode, process_delta_mode
+from zoe import run, process_new_mode, process_delta_mode, build_detail_record, build_header_record, build_trailer_record
 
 def test_run_new_mode(script_data_new, mocker):
     apwx = script_data_new.apwx
@@ -69,3 +69,24 @@ def test_process_delta_mode_creates_file(script_data_delta, mocker):
         lines = [line.strip() for line in f.readlines() if line.strip()]
     assert any("CDE0380" in line for line in lines)
     assert any("6|A|03|FTF" in line for line in lines)
+
+
+def test_build_detail_record_basic():
+    record_ary = ["ACC123", "PERS456", "VAL1", "VAL2", "VAL3"]
+    p2p_cust = {"PERS456": {"CXCCustomerID": "CXC789", "registeredEmail": "test@email.com", "registeredPhone": "1234567890"}}
+    result = build_detail_record(record_ary, p2p_cust)
+    assert result.startswith("ACC123|PERS456|CXC789")
+    assert "test@email.com" in result
+    assert "1234567890" in result or result.endswith("|1|1")
+
+def test_build_header_record():
+    args = {"fileType": "LOAD", "test": "Y"}
+    result = build_header_record(args)
+    assert result == "1|LOAD|03|FTF"
+
+def test_build_trailer_record():
+    args = {"fileType": "LOAD", "test": "Y", "record_ct": 10, "acctHash": 123, "added": 5, "changed": 2, "deleted": 1}
+    result = build_trailer_record(args)
+    assert result.startswith("9|LOAD|03|FTF")
+    assert "CDE0083" in result and "CDE0084" in result
+    assert "CDE0123:123" in result or ":123" in result
